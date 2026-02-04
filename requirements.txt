@@ -1,0 +1,32 @@
+# FastAPI and server
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Database
+sqlalchemy
+aiosqlite
+asyncpg
+motor
+pymongo
+
+# Authentication & Security
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt
+
+# Validation & Settings
+pydantic
+pydantic-settings
+email-validator
+
+# Development
+python-dotenv
+
+# Testing
+pytest
+pytest-asyncio
+httpx
+
+# Logging
+loguru>=0.7.2
