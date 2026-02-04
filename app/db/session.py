@@ -1,13 +1,13 @@
-from motor.motor_asyncio import AsyncClient
+from motor.motor_asyncio import AsyncIOMotorClient
 from app.core.config import settings
 
 # MongoDB setup
-mongodb_client: AsyncClient = None
+mongodb_client: AsyncIOMotorClient = None
 
 async def connect_mongo():
     """Connect to MongoDB."""
     global mongodb_client
-    mongodb_client = AsyncClient(settings.MONGODB_URI)
+    mongodb_client = AsyncIOMotorClient(settings.MONGODB_URI)
     # Verify connection
     await mongodb_client.admin.command('ping')
     print("MongoDB connected successfully")

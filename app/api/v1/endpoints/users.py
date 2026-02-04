@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
-from app.db.session import get_db
+from app.db.session import get_database
 from app.schemas.user import UserRead, UserUpdate
 from app.services.user_service import UserService
 from app.api.deps import get_current_user, get_current_superuser
@@ -23,9 +22,9 @@ async def get_current_user_info(
 async def update_current_user(
     user_update: UserUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
 ):
     """Update current user information."""
+    db = get_database()
     user_service = UserService(db)
     updated_user = await user_service.update(current_user.id, user_update)
     return updated_user
@@ -36,9 +35,9 @@ async def get_users(
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(get_current_superuser),
-    db: AsyncSession = Depends(get_db),
 ):
     """Get all users (superuser only)."""
+    db = get_database()
     user_service = UserService(db)
     users = await user_service.get_all(skip=skip, limit=limit)
     return users
@@ -48,9 +47,9 @@ async def get_users(
 async def get_user(
     user_id: int,
     current_user: User = Depends(get_current_superuser),
-    db: AsyncSession = Depends(get_db),
 ):
     """Get user by ID (superuser only)."""
+    db = get_database()
     user_service = UserService(db)
     user = await user_service.get_by_id(user_id)
     
@@ -67,9 +66,9 @@ async def get_user(
 async def delete_user(
     user_id: int,
     current_user: User = Depends(get_current_superuser),
-    db: AsyncSession = Depends(get_db),
 ):
     """Delete user (superuser only)."""
+    db = get_database()
     user_service = UserService(db)
     user = await user_service.get_by_id(user_id)
     

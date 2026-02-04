@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from pydantic import AnyHttpUrl, field_validator
+from pydantic import field_validator
 from typing import List, Union
 import secrets
 
@@ -23,16 +23,14 @@ class Settings(BaseSettings):
     MONGODB_DB_NAME: str = "myshop"
     
     # CORS
-    BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
+    BACKEND_CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8080"
     
-    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
-    @classmethod
-    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
-            return v
-        raise ValueError(v)
+    @property
+    def cors_origins(self) -> List[str]:
+        """Parse CORS origins from string."""
+        if isinstance(self.BACKEND_CORS_ORIGINS, str):
+            return [i.strip() for i in self.BACKEND_CORS_ORIGINS.split(",")]
+        return self.BACKEND_CORS_ORIGINS
     
     # Environment
     ENVIRONMENT: str = "development"

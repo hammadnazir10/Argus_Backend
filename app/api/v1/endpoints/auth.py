@@ -1,9 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 
-from app.db.session import get_db
+from app.db.session import get_database
 from app.schemas.token import Token, RefreshTokenRequest
 from app.schemas.user import UserCreate, UserRead
 from app.services.user_service import UserService
@@ -20,9 +19,9 @@ router = APIRouter()
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def register(
     user_in: UserCreate,
-    db: AsyncSession = Depends(get_db),
 ):
     """Register a new user."""
+    db = get_database()
     user_service = UserService(db)
     
     # Check if user exists
@@ -47,9 +46,9 @@ async def register(
 @router.post("/login", response_model=Token)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: AsyncSession = Depends(get_db),
 ):
     """Login and get access token."""
+    db = get_database()
     user_service = UserService(db)
     user = await user_service.get_by_email(form_data.username)
     
@@ -78,7 +77,6 @@ async def login(
 @router.post("/refresh", response_model=Token)
 async def refresh_token(
     request: RefreshTokenRequest,
-    db: AsyncSession = Depends(get_db),
 ):
     """Refresh access token."""
     payload = decode_token(request.refresh_token)
@@ -89,6 +87,7 @@ async def refresh_token(
             detail="Invalid refresh token",
         )
     
+    db = get_database()
     user_service = UserService(db)
     user = await user_service.get_by_id(int(payload.get("sub")))
     
