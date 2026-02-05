@@ -1,29 +1,52 @@
-from motor.motor_asyncio import AsyncIOMotorClient
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from app.core.config import settings
+from app.db.base import Base
 
-# MongoDB setup
-mongodb_client: AsyncIOMotorClient = None
+# PostgreSQL async engine and session
+engine = None
+AsyncSessionLocal = None
 
-async def connect_mongo():
-    """Connect to MongoDB."""
-    global mongodb_client
-    mongodb_client = AsyncIOMotorClient(settings.MONGODB_URI)
-    # Verify connection
-    await mongodb_client.admin.command('ping')
-    print("MongoDB connected successfully")
+async def init_database():
+    """Initialize database - create all tables."""
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("✓ Database tables created successfully")
+    except Exception as e:
+        print(f"✗ Error creating database tables: {e}")
+        raise
 
-async def close_mongo():
-    """Close MongoDB connection."""
-    global mongodb_client
-    if mongodb_client:
-        mongodb_client.close()
-        print("MongoDB connection closed")
+async def connect_db():
+    """Connect to PostgreSQL database and initialize."""
+    global engine, AsyncSessionLocal
+    try:
+        engine = create_async_engine(
+            settings.DATABASE_URL,
+            echo=False,
+            future=True,
+            pool_pre_ping=True,
+        )
+        AsyncSessionLocal = async_sessionmaker(
+            engine, class_=AsyncSession, expire_on_commit=False
+        )
+        # Initialize database - create all tables
+        await init_database()
+        print("✓ PostgreSQL connected successfully")
+    except Exception as e:
+        print(f"✗ Error connecting to PostgreSQL: {e}")
+        raise
 
-def get_mongodb():
-    """Get MongoDB client."""
-    return mongodb_client
+async def close_db():
+    """Close PostgreSQL connection."""
+    global engine
+    if engine:
+        await engine.dispose()
+        print("PostgreSQL connection closed")
 
-def get_database(db_name: str = None):
-    """Get MongoDB database instance."""
-    db_name = db_name or settings.MONGODB_DB_NAME
-    return mongodb_client[db_name]
+async def get_database() -> AsyncSession:
+    """Get database session for dependency injection."""
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()

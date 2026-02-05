@@ -5,10 +5,9 @@ python-multipart
 
 # Database
 sqlalchemy
-aiosqlite
 asyncpg
-motor
-pymongo
+psycopg2-binary
+alembic
 
 # Authentication & Security
 python-jose[cryptography]
@@ -20,6 +19,11 @@ pydantic
 pydantic-settings
 email-validator
 
+# File processing
+pandas
+openpyxl
+aiofiles
+
 # Development
 python-dotenv
 
@@ -30,3 +34,6 @@ httpx
 
 # Logging
 loguru>=0.7.2
+
+# AWS SDK
+boto3

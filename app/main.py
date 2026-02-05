@@ -4,19 +4,19 @@ from contextlib import asynccontextmanager
 
 from app.api.v1.router import api_router
 from app.core.config import settings
-from app.db.session import connect_mongo, close_mongo
+from app.db.session import connect_db, close_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
-    # Startup: Connect MongoDB
-    await connect_mongo()
+    # Startup: Connect to PostgreSQL
+    await connect_db()
     
     yield
     
     # Shutdown: Clean up resources
-    await close_mongo()
+    await close_db()
 
 
 app = FastAPI(

@@ -19,8 +19,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     
     # Database
-    MONGODB_URI: str = ""
-    MONGODB_DB_NAME: str = "myshop"
+    DATABASE_URL: str = ""
     
     # CORS
     BACKEND_CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8080"
@@ -35,6 +34,18 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
+    
+    # AWS Configuration
+    AWS_REGION: str = "us-east-1"
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+    
+    # S3 Configuration
+    S3_BUCKET_NAME: str = "argus-user-uploads-dev"
+    S3_UPLOAD_FOLDER: str = "uploads"
+    
+    # DynamoDB Configuration
+    DYNAMODB_JOBS_TABLE: str = "argus-jobs"
     
     class Config:
         env_file = ".env"
