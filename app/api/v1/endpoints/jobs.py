@@ -70,11 +70,11 @@ async def get_job_status(job_id: str, user: dict = Depends(get_optional_user), d
 
 
 @router.post("/{job_id}/upload-bom", response_model=ResponseModel[BOMUploadResponse], status_code=status.HTTP_201_CREATED)
-async def upload_bom_file(job_id: str, file: UploadFile = File(..., description="BOM file (.xlsm or .xlsx format)"), db = Depends(get_database)) -> dict:
+async def upload_bom_file(job_id: str, file: UploadFile = File(..., description="BOM file (.xlsm or .xlsx format)"), user: dict = Depends(get_optional_user), db = Depends(get_database)) -> dict:
     """Upload BOM file for a job."""
     try:
         job_service = JobService(db)
-        result = await job_service.upload_bom_file(job_id=job_id, user_id="anonymous", file=file)
+        result = await job_service.upload_bom_file(job_id=job_id, user_id=user["username"] if user else "anonymous", file=file)
         return {
             "success": True,
             "message": f"BOM file '{result['filename']}' uploaded successfully with {result['row_count']} rows",

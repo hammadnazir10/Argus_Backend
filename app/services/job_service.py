@@ -63,7 +63,7 @@ class JobService:
         
         # Create S3 folder for this job as per Story 1.1 acceptance criteria
         try:
-            folder_created = await create_s3_job_folder(job_id)
+            folder_created = await create_s3_job_folder(job_id, job_in.project_name)
             if not folder_created:
                 raise Exception("Failed to create job folder in S3")
         except Exception as e:
@@ -356,7 +356,7 @@ class JobService:
         
         # Generate S3 key as per Story 1.2 requirements
         sanitized_filename = sanitize_filename(file.filename)
-        s3_key = get_s3_key_for_bom(job_id, sanitized_filename)
+        s3_key = get_s3_key_for_bom(job_id, sanitized_filename, job.project_name)
         
         # Upload to S3 with progress tracking
         try:
@@ -415,9 +415,14 @@ class JobService:
             
         Raises:
             ValueError: If files are invalid or job not found
+            HTTPException: If upload fails
         """
-        # Verify job exists and user owns it
-        job = await self.get_job_by_id(job_id, user_id)
+        # Verify job exists - skip user ownership verification if anonymous
+        if user_id == "anonymous":
+            job = await self.get_job_by_id(job_id)
+        else:
+            job = await self.get_job_by_id(job_id, user_id)
+        
         if not job:
             raise ValueError(f"Job {job_id} not found")
         
@@ -427,48 +432,82 @@ class JobService:
         uploaded_files = []
         quote_file_keys = job.quote_file_keys or []
         
-        # Create storage directory
-        storage_dir = f"uploads/{job_id}"
-        os.makedirs(storage_dir, exist_ok=True)
-        
         try:
             for i, file in enumerate(files):
                 # Validate file extension
                 if not validate_file_extension(file.filename, ALLOWED_QUOTE_EXTENSIONS):
                     raise ValueError(f"Invalid file type for '{file.filename}'. Quote files must be one of: {', '.join(ALLOWED_QUOTE_EXTENSIONS)}")
                 
-                # Check file size
-                content = await file.read()
-                if len(content) > MAX_QUOTE_FILE_SIZE:
-                    raise ValueError(f"File '{file.filename}' exceeds maximum limit of {MAX_QUOTE_FILE_SIZE // (1024 * 1024)}MB")
+                # Read file content
+                try:
+                    file_content = await file.read()
+                except Exception as e:
+                    raise ValueError(f"Failed to read file '{file.filename}': {str(e)}")
                 
-                # Generate unique filename to avoid conflicts
-                file_ext = file.filename.rsplit(".", 1)[-1].lower()
-                safe_filename = re.sub(r'[^a-zA-Z0-9\-_.]', '_', file.filename)
-                file_key = f"{storage_dir}/quote-{i+len(quote_file_keys)}-{safe_filename}"
+                # Check file size
+                file_size = len(file_content)
+                if file_size == 0:
+                    raise ValueError(f"File '{file.filename}' is empty")
+                
+                if file_size > MAX_QUOTE_FILE_SIZE:
+                    max_size_mb = MAX_QUOTE_FILE_SIZE // (1024 * 1024)
+                    raise ValueError(f"File '{file.filename}' exceeds maximum limit of {max_size_mb}MB")
                 
                 # Validate file magic number (except for CSV which has no fixed signature)
-                if file_ext != "csv" and not validate_file_magic_number(content, file_ext):
+                file_ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+                if file_ext != "csv" and not validate_file_magic_number(file_content, file_ext):
                     raise ValueError(f"File '{file.filename}' appears to be corrupted or invalid")
                 
-                # Save file
-                with open(file_key, "wb") as f:
-                    f.write(content)
+                # Generate S3 key for quote file
+                sanitized_filename = sanitize_filename(file.filename)
+                quote_index = i + len(quote_file_keys) + 1
+                s3_key = get_s3_key_for_quote(job_id, sanitized_filename, quote_index, job.project_name)
+                
+                # Upload to S3
+                try:
+                    upload_result = await s3_manager.upload_file(
+                        file_content=file_content,
+                        file_key=s3_key,
+                        content_type="application/octet-stream"  # Generic content type for various file types
+                    )
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to upload file '{file.filename}' to S3: {str(e)}"
+                    )
                 
                 # Add to quote file keys
-                quote_file_keys.append(file_key)
+                quote_file_keys.append(s3_key)
                 
                 uploaded_files.append({
-                    "filename": file.filename,
-                    "file_key": file_key,
-                    "file_size": len(content),
+                    "filename": sanitized_filename,
+                    "original_filename": file.filename,
+                    "file_key": s3_key,
+                    "file_size": file_size,
                     "vendor_name": "",  # Can be edited later by user
+                    "s3_url": upload_result.get("s3_url"),
+                    "upload_id": upload_result.get("upload_id"),
+                    "etag": upload_result.get("etag")
                 })
             
             # Update job with new quote file keys
             job.quote_file_keys = quote_file_keys
-            await self.db.commit()
-            await self.db.refresh(job)
+            job.status = "quotes_uploaded"  # Update status to indicate quotes uploaded
+            
+            try:
+                await self.db.commit()
+                await self.db.refresh(job)
+            except Exception as e:
+                # Try to clean up S3 files if database update fails
+                for file_info in uploaded_files:
+                    try:
+                        await s3_manager.delete_file(file_info["file_key"])
+                    except:
+                        pass
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to update job: {str(e)}"
+                )
             
             return {
                 "job_id": job_id,
@@ -476,11 +515,13 @@ class JobService:
                 "total_files": len(uploaded_files)
             }
             
-        except Exception as e:
-            # Clean up any uploaded files on error
+        except (HTTPException, ValueError) as e:
+            # Clean up any uploaded S3 files on error
             for file_info in uploaded_files:
-                if os.path.exists(file_info["file_key"]):
-                    os.remove(file_info["file_key"])
+                try:
+                    await s3_manager.delete_file(file_info["file_key"])
+                except:
+                    pass
             raise
     
     async def start_analysis(self, job_id: str, user_id: str) -> dict:

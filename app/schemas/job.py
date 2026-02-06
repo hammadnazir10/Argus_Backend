@@ -18,7 +18,11 @@ class JobBase(BaseModel):
             try:
                 # Handle ISO format (2026-02-05T11:00:00)
                 if 'T' in value:
-                    return datetime.fromisoformat(value.replace('Z', '+00:00'))
+                    dt = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                    # Convert timezone-aware datetime to naive UTC datetime
+                    if dt.tzinfo is not None:
+                        return dt.astimezone().replace(tzinfo=None)
+                    return dt
                 # Handle date only format (2026-02-05)
                 elif len(value) == 10 and value.count('-') == 2:
                     return datetime.strptime(value, "%Y-%m-%d")
@@ -27,6 +31,11 @@ class JobBase(BaseModel):
                     return datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
             except (ValueError, TypeError) as e:
                 raise ValueError(f"Invalid date format: {value}. Expected ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD HH:MM:SS")
+        elif isinstance(value, datetime):
+            # Handle datetime objects - ensure they are timezone-naive
+            if value.tzinfo is not None:
+                return value.astimezone().replace(tzinfo=None)
+            return value
         return value
 
 class JobCreate(JobBase):

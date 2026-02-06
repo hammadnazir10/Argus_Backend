@@ -284,16 +284,49 @@ class S3UploadManager:
 s3_manager = S3UploadManager()
 
 
-def get_s3_key_for_bom(job_id: str, filename: str) -> str:
+def sanitize_project_name(project_name: str) -> str:
+    """
+    Sanitize project name for safe use in S3 folder names.
+    
+    Args:
+        project_name: Original project name
+        
+    Returns:
+        Sanitized project name safe for S3 folder names
+    """
+    import re
+    
+    if not project_name:
+        return "unnamed"
+    
+    # Replace spaces with underscores and keep only alphanumeric, underscores, and hyphens
+    sanitized = re.sub(r'[^a-zA-Z0-9\-_]', '_', project_name.strip())
+    
+    # Remove multiple consecutive underscores
+    sanitized = re.sub(r'_{2,}', '_', sanitized)
+    
+    # Remove leading/trailing underscores
+    sanitized = sanitized.strip('_')
+    
+    # Ensure it's not empty and limit length
+    if not sanitized:
+        sanitized = "unnamed"
+    
+    # Limit to 50 characters for S3 folder safety
+    return sanitized[:50].lower()
+
+
+def get_s3_key_for_bom(job_id: str, filename: str, project_name: str = None) -> str:
     """
     Generate S3 key for BOM file as per Story 1.2 requirements.
     
     Args:
         job_id: Job ID
         filename: Original filename
+        project_name: Optional project name for folder structure
         
     Returns:
-        S3 key in format: argus-user-uploads/{job_id}/bom.xlsm
+        S3 key in format: {job_id}_{project_name}/bom.xlsm
     """
     # Extract file extension
     file_ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else 'xlsx'
@@ -302,10 +335,17 @@ def get_s3_key_for_bom(job_id: str, filename: str) -> str:
     if file_ext not in ['xlsm', 'xlsx']:
         file_ext = 'xlsm'  # Default to xlsm as per story requirements
     
-    return f"{job_id}/bom.{file_ext}"
+    # Create folder name with job_id and project_name
+    if project_name:
+        sanitized_name = sanitize_project_name(project_name)
+        folder_name = f"{job_id}_{sanitized_name}"
+    else:
+        folder_name = job_id
+    
+    return f"{folder_name}/bom.{file_ext}"
 
 
-def get_s3_key_for_quote(job_id: str, filename: str, quote_index: int) -> str:
+def get_s3_key_for_quote(job_id: str, filename: str, quote_index: int, project_name: str = None) -> str:
     """
     Generate S3 key for quote file.
     
@@ -313,26 +353,43 @@ def get_s3_key_for_quote(job_id: str, filename: str, quote_index: int) -> str:
         job_id: Job ID
         filename: Original filename
         quote_index: Index of the quote file (1-based)
+        project_name: Optional project name for folder structure
         
     Returns:
-        S3 key in format: {job_id}/quote-{n}.{ext}
+        S3 key in format: {job_id}_{project_name}/quote-{n}.{ext}
     """
     file_ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else 'pdf'
-    return f"{job_id}/quote-{quote_index}.{file_ext}"
+    
+    # Create folder name with job_id and project_name
+    if project_name:
+        sanitized_name = sanitize_project_name(project_name)
+        folder_name = f"{job_id}_{sanitized_name}"
+    else:
+        folder_name = job_id
+    
+    return f"{folder_name}/quote-{quote_index}.{file_ext}"
 
 
-async def create_s3_job_folder(job_id: str) -> bool:
+async def create_s3_job_folder(job_id: str, project_name: str = None) -> bool:
     """
     Create a job folder in S3 by uploading a placeholder object.
     
     Args:
         job_id: Job ID
+        project_name: Optional project name for folder structure
         
     Returns:
         True if successful, False otherwise
     """
     try:
-        placeholder_key = f"{job_id}/.placeholder"
+        # Create folder name with job_id and project_name
+        if project_name:
+            sanitized_name = sanitize_project_name(project_name)
+            folder_name = f"{job_id}_{sanitized_name}"
+        else:
+            folder_name = job_id
+            
+        placeholder_key = f"{folder_name}/.placeholder"
         await s3_manager.upload_file(
             file_content=b"",
             file_key=placeholder_key,
