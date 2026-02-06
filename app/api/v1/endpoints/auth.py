@@ -3,10 +3,9 @@ Authentication endpoints.
 Handles user signup, signin, email verification, and password management.
 """
 
-from fastapi import APIRouter, status, HTTPException
-from loguru import logger
+import logging
 from botocore.exceptions import ClientError
-
+from fastapi import APIRouter, status, HTTPException
 from app.schemas.auth import (
     SignUpRequest,
     SignUpResponse,
@@ -28,9 +27,9 @@ from app.schemas.auth import (
     SignOutResponse,
     ErrorResponse,
 )
-from app.services.auth_service import cognito_service
-from app.exceptions.auth_exceptions import handle_cognito_error
+from app.services.auth_service import cognito_service, handle_cognito_error
 
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Authentication"])
 
 
@@ -59,33 +58,14 @@ async def sign_up(request: SignUpRequest):
     - email: Valid email address
     - password: Strong password (minimum 8 characters)
     
-    **Response:**
-    - user_sub: Unique user ID from Cognito
-    - username: The registered username
-    - code_delivery_details: Information about verification code delivery
-    
     **Note:** User must confirm email before signing in.
     """
-    try:
-        logger.info(f"Processing signup request for username: {request.username}")
-        
-        result = cognito_service.sign_up(
-            email=request.email,
-            password=request.password,
-            username=request.username,
-        )
-        
-        return SignUpResponse(**result)
-        
-    except ClientError as e:
-        logger.error(f"Signup failed for {request.username}: {str(e)}")
-        raise handle_cognito_error(e, context="signup")
-    except Exception as e:
-        logger.error(f"Unexpected error during signup: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred during signup",
-        )
+    result = cognito_service.handle_signup(
+        username=request.username,
+        email=request.email,
+        password=request.password
+    )
+    return SignUpResponse(**result)
 
 
 # ============================================================================
@@ -112,30 +92,13 @@ async def confirm_email(request: ConfirmEmailRequest):
     - username: Username or email address 
     - confirmation_code: 6-digit code received via email
     
-    **Response:**
-    - message: Confirmation success message
-    
     **Note:** User can now sign in after email confirmation.
     """
-    try:
-        logger.info(f"Processing email confirmation for username: {request.username}")
-        
-        result = cognito_service.confirm_sign_up(
-            identifier=request.username,
-            confirmation_code=request.confirmation_code,
-        )
-        
-        return ConfirmEmailResponse(**result)
-        
-    except ClientError as e:
-        logger.error(f"Email confirmation failed for {request.username}: {str(e)}")
-        raise handle_cognito_error(e, context="confirm_email")
-    except Exception as e:
-        logger.error(f"Unexpected error during email confirmation: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred during email confirmation",
-        )
+    result = cognito_service.handle_confirm_email(
+        identifier=request.username,
+        confirmation_code=request.confirmation_code
+    )
+    return ConfirmEmailResponse(**result)
 
 
 @router.post(
@@ -157,33 +120,10 @@ async def resend_confirmation_code(request: ResendConfirmationCodeRequest):
     **Request Body:**
     - username: Username or email address
     
-    **Response:**
-    - message: Confirmation code resent message
-    - code_delivery_details: Information about code delivery
-    
     **Note:** Useful if user doesn't receive initial confirmation code.
     """
-    try:
-        logger.info(f"Resending confirmation code for username: {request.username}")
-        
-        result = cognito_service.resend_confirmation_code(
-            identifier=request.username,
-        )
-        
-        return ResendConfirmationCodeResponse(
-            message="Confirmation code sent to your email",
-            code_delivery_details=result.get('code_delivery_details'),
-        )
-        
-    except ClientError as e:
-        logger.error(f"Resend confirmation failed for {request.username}: {str(e)}")
-        raise handle_cognito_error(e, context="resend_confirmation_code")
-    except Exception as e:
-        logger.error(f"Unexpected error during resend confirmation: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred while resending confirmation code",
-        )
+    result = cognito_service.handle_resend_code(identifier=request.username)
+    return ResendConfirmationCodeResponse(**result)
 
 
 # ============================================================================
@@ -325,33 +265,19 @@ async def confirm_forgot_password(request: ConfirmForgotPasswordRequest):
     - confirmation_code: 6-digit code received via email
     - new_password: New password (minimum 8 characters)
     
-    **Response:**
-    - message: Password reset success message
-    
     **Note:** User can sign in with new password after confirmation.
     """
-    try:
-        logger.info(f"Processing confirm forgot password for: {request.identifier}")
-        
-        result = cognito_service.confirm_forgot_password(
-            identifier=request.identifier,
-            confirmation_code=request.confirmation_code,
-            new_password=request.new_password,
-        )
-        
-        return ConfirmForgotPasswordResponse(**result)
-        
-    except ClientError as e:
-        logger.error(f"Confirm forgot password failed for {request.identifier}: {str(e)}")
-        raise handle_cognito_error(e, context="confirm_forgot_password")
-    except Exception as e:
-        logger.error(f"Unexpected error during confirm forgot password: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred during password reset confirmation",
-        )
+    result = cognito_service.handle_confirm_forgot_password(
+        identifier=request.identifier,
+        confirmation_code=request.confirmation_code,
+        new_password=request.new_password
+    )
+    return ConfirmForgotPasswordResponse(**result)
 
 
+# ============================================================================
+# Change Password Endpoint
+# ============================================================================
 @router.post(
     "/change-password",
     response_model=ChangePasswordResponse,
@@ -372,40 +298,17 @@ async def change_password(request: ChangePasswordRequest, access_token: str = No
     - previous_password: Current password
     - proposed_password: New password (minimum 8 characters)
     
-    **Headers:**
-    - Authorization: Bearer <access_token>
-    
-    **Response:**
-    - message: Password change success message
-    
     **Note:** Requires valid access token from recent signin.
     """
     if not access_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization token required",
-        )
+        raise HTTPException(status_code=401, detail="Authorization token required")
     
-    try:
-        logger.info("Processing change password request")
-        
-        result = cognito_service.change_password(
-            access_token=access_token,
-            previous_password=request.previous_password,
-            proposed_password=request.proposed_password,
-        )
-        
-        return ChangePasswordResponse(**result)
-        
-    except ClientError as e:
-        logger.error(f"Change password failed: {str(e)}")
-        raise handle_cognito_error(e, context="change_password")
-    except Exception as e:
-        logger.error(f"Unexpected error during change password: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred during password change",
-        )
+    result = cognito_service.handle_change_password(
+        access_token=access_token,
+        previous_password=request.previous_password,
+        proposed_password=request.proposed_password
+    )
+    return ChangePasswordResponse(**result)
 
 
 # ============================================================================
@@ -430,28 +333,10 @@ async def sign_out(request: SignOutRequest):
     **Request Body:**
     - access_token: User access token from signin response
     
-    **Response:**
-    - message: Sign out success message
-    
     **Note:** User will be signed out from all sessions and devices.
     """
-    try:
-        logger.info("Processing user sign out")
-        
-        # Note: AWS Cognito admin_user_global_sign_out requires user pool admin access
-        # For now, we'll just return success as the token will be invalid after expiry
-        # In production, you might want to maintain a token blacklist
-        
-        return SignOutResponse(
-            message="Signed out successfully. Token will expire shortly.",
-        )
-        
-    except Exception as e:
-        logger.error(f"Unexpected error during sign out: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred during sign out",
-        )
+    result = cognito_service.handle_sign_out(access_token=request.access_token)
+    return SignOutResponse(**result)
 
 
 # ============================================================================
@@ -476,45 +361,11 @@ async def get_user_profile(access_token: str = None):
     **Headers:**
     - Authorization: Bearer <access_token>
     
-    **Response:**
-    - username: User's username
-    - email: User's email address
-    - email_verified: Whether email is verified
-    - given_name: User's first name (if provided)
-    - family_name: User's last name (if provided)
-    - sub: Unique user ID
-    
     **Note:** Requires valid access token from recent signin.
     """
     if not access_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization token required",
-        )
+        raise HTTPException(status_code=401, detail="Authorization token required")
     
-    try:
-        logger.info("Retrieving user profile")
-        
-        result = cognito_service.get_user(access_token=access_token)
-        
-        attributes = result.get('attributes', {})
-        
-        return UserProfileResponse(
-            username=result.get('username'),
-            email=attributes.get('email'),
-            email_verified=attributes.get('email_verified', '').lower() == 'true',
-            given_name=attributes.get('given_name'),
-            family_name=attributes.get('family_name'),
-            sub=attributes.get('sub'),
-        )
-        
-    except ClientError as e:
-        logger.error(f"Get user profile failed: {str(e)}")
-        raise handle_cognito_error(e, context="get_user_profile")
-    except Exception as e:
-        logger.error(f"Unexpected error while retrieving user profile: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred while retrieving user profile",
-        )
+    result = cognito_service.handle_get_user_profile(access_token=access_token)
+    return UserProfileResponse(**result)
 

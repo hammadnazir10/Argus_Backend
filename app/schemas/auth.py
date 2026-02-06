@@ -15,15 +15,6 @@ class SignUpRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=128)
     email: EmailStr
     password: str = Field(..., min_length=8)
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "username": "john_doe",
-                "email": "john@example.com",
-                "password": "SecurePassword123!",
-            }
-        }
 
 
 class SignUpResponse(BaseModel):
@@ -42,14 +33,6 @@ class ConfirmEmailRequest(BaseModel):
     """Email confirmation request."""
     username: str = Field(..., min_length=3, max_length=128, description="Username or email address")
     confirmation_code: str = Field(..., min_length=6, max_length=6)
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "username": "hammadnazir or hammadnazir106@gmail.com",
-                "confirmation_code": "123456",
-            }
-        }
 
 
 class ConfirmEmailResponse(BaseModel):
@@ -60,13 +43,6 @@ class ConfirmEmailResponse(BaseModel):
 class ResendConfirmationCodeRequest(BaseModel):
     """Resend confirmation code request."""
     username: str = Field(..., min_length=3, max_length=128, description="Username or email address")
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "username": "hammadnazir or hammadnazir106@gmail.com",
-            }
-        }
 
 
 class ResendConfirmationCodeResponse(BaseModel):
@@ -83,14 +59,6 @@ class SignInRequest(BaseModel):
     """User signin request."""
     username: str = Field(..., min_length=3, max_length=128, description="Username or email address")
     password: str = Field(...)
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "username": "john_doe or john@example.com",
-                "password": "SecurePassword123!",
-            }
-        }
 
 
 class TokenResponse(BaseModel):
@@ -116,13 +84,6 @@ class SignInResponse(BaseModel):
 class ForgotPasswordRequest(BaseModel):
     """Forgot password request."""
     identifier: str = Field(..., min_length=3, max_length=128, description="Username or email address")
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "identifier": "john_doe or john@example.com",
-            }
-        }
 
 
 class ForgotPasswordResponse(BaseModel):
@@ -136,15 +97,6 @@ class ConfirmForgotPasswordRequest(BaseModel):
     identifier: str = Field(..., min_length=3, max_length=128, description="Username or email address")
     confirmation_code: str = Field(..., min_length=6, max_length=6)
     new_password: str = Field(..., min_length=8)
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "identifier": "john_doe or john@example.com",
-                "confirmation_code": "123456",
-                "new_password": "NewPassword123!",
-            }
-        }
 
 
 class ConfirmForgotPasswordResponse(BaseModel):
@@ -156,14 +108,6 @@ class ChangePasswordRequest(BaseModel):
     """Change password request."""
     previous_password: str = Field(...)
     proposed_password: str = Field(..., min_length=8)
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "previous_password": "OldPassword123!",
-                "proposed_password": "NewPassword123!",
-            }
-        }
 
 
 class ChangePasswordResponse(BaseModel):
@@ -178,13 +122,6 @@ class ChangePasswordResponse(BaseModel):
 class RefreshTokenRequest(BaseModel):
     """Refresh token request."""
     refresh_token: str
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "refresh_token": "eyJjdHkiOiJKV1QiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2IiwiYWxnIjoiUlNBLU9BRVAifQ...",
-            }
-        }
 
 
 class RefreshTokenResponse(BaseModel):
