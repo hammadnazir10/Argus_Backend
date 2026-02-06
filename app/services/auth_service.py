@@ -6,7 +6,8 @@ Handles user signup, signin, email verification, and token management.
 import hmac
 import hashlib
 import base64
-from typing import Dict
+import re
+from typing import Dict, Union
 import boto3
 from botocore.exceptions import ClientError
 from loguru import logger
@@ -28,6 +29,38 @@ class CognitoAuthService:
         self.user_pool_id = settings.COGNITO_USER_POOL_ID
         self.client_id = settings.COGNITO_CLIENT_ID
         self.client_secret = settings.COGNITO_CLIENT_SECRET
+    
+    def _is_email(self, identifier: str) -> bool:
+        """Check if identifier is an email address."""
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        return re.match(email_pattern, identifier) is not None
+    
+    def _try_get_user_by_identifier(self, identifier: str) -> Union[str, None]:
+        """
+        Try to find user by identifier (username or email).
+        Returns the Cognito username if found, None if not found.
+        """
+        try:
+            # First, try identifier as-is (could be username)
+            self.client.admin_get_user(
+                UserPoolId=self.user_pool_id,
+                Username=identifier
+            )
+            return identifier
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'UserNotFoundException':
+                # If identifier looks like email, try to find user by email attribute
+                if self._is_email(identifier):
+                    try:
+                        response = self.client.list_users(
+                            UserPoolId=self.user_pool_id,
+                            Filter=f'email = "{identifier}"'
+                        )
+                        if response['Users']:
+                            return response['Users'][0]['Username']
+                    except ClientError:
+                        pass
+            return None
     
     def _get_secret_hash(self, username: str) -> str:
         """
@@ -90,14 +123,14 @@ class CognitoAuthService:
     
     def confirm_sign_up(
         self,
-        email: str,
+        identifier: str,
         confirmation_code: str,
     ) -> Dict:
         """
         Confirm user email during signup.
         
         Args:
-            email: User email (used as identifier with email alias)
+            identifier: Username or email address
             confirmation_code: Email confirmation code
             
         Returns:
@@ -107,29 +140,36 @@ class CognitoAuthService:
             ClientError: If confirmation fails
         """
         try:
-            # With email alias enabled, can confirm using email as identifier
+            # Find the actual Cognito username
+            cognito_username = self._try_get_user_by_identifier(identifier)
+            if not cognito_username:
+                raise ClientError(
+                    {'Error': {'Code': 'UserNotFoundException'}},
+                    'AdminGetUser'
+                )
+            
             self.client.confirm_sign_up(
                 ClientId=self.client_id,
-                Username=email,
+                Username=cognito_username,
                 ConfirmationCode=confirmation_code,
-                SecretHash=self._get_secret_hash(email),
+                SecretHash=self._get_secret_hash(cognito_username),
             )
-            logger.info(f"Email confirmed for user {email}")
+            logger.info(f"Email confirmed for user {identifier} (Cognito: {cognito_username})")
             return {'message': 'Email confirmed successfully'}
         except ClientError as e:
-            logger.error(f"Confirmation error for {email}: {e.response['Error']['Code']}")
+            logger.error(f"Confirmation error for {identifier}: {e.response['Error']['Code']}")
             raise
     
     def initiate_auth(
         self,
-        username: str,
+        identifier: str,
         password: str,
     ) -> Dict:
         """
-        Authenticate user using username and password.
+        Authenticate user using username/email and password.
         
         Args:
-            username: Cognito username or email (if email alias is enabled)
+            identifier: Username or email address
             password: User password
             
         Returns:
@@ -139,18 +179,26 @@ class CognitoAuthService:
             ClientError: If authentication fails
         """
         try:
+            # Find the actual Cognito username
+            cognito_username = self._try_get_user_by_identifier(identifier)
+            if not cognito_username:
+                raise ClientError(
+                    {'Error': {'Code': 'UserNotFoundException'}},
+                    'AdminInitiateAuth'
+                )
+            
             # Use ADMIN_USER_PASSWORD_AUTH flow for username/password authentication
             response = self.client.admin_initiate_auth(
                 UserPoolId=self.user_pool_id,
                 ClientId=self.client_id,
                 AuthFlow='ADMIN_USER_PASSWORD_AUTH',
                 AuthParameters={
-                    'USERNAME': username,
+                    'USERNAME': cognito_username,
                     'PASSWORD': password,
-                    'SECRET_HASH': self._get_secret_hash(username),
+                    'SECRET_HASH': self._get_secret_hash(cognito_username),
                 },
             )
-            logger.info(f"User {username} authenticated successfully")
+            logger.info(f"User {identifier} (Cognito: {cognito_username}) authenticated successfully")
             
             auth_result = response.get('AuthenticationResult', {})
             access_token = auth_result.get('AccessToken')
@@ -167,9 +215,9 @@ class CognitoAuthService:
                     'username': user_response.get('Username'),
                     'email': user_attributes.get('email'),
                 }
-                logger.info(f"Retrieved user info for {username}: {user_info}")
+                logger.info(f"Retrieved user info for {identifier}: {user_info}")
             except Exception as e:
-                logger.warning(f"Could not retrieve user info for {username}: {str(e)}")
+                logger.warning(f"Could not retrieve user info for {identifier}: {str(e)}")
             
             return {
                 'access_token': access_token,
@@ -180,15 +228,15 @@ class CognitoAuthService:
                 'user': user_info,
             }
         except ClientError as e:
-            logger.error(f"Authentication error for {username}: {e.response['Error']['Code']}")
+            logger.error(f"Authentication error for {identifier}: {e.response['Error']['Code']}")
             raise
     
-    def resend_confirmation_code(self, email: str) -> Dict:
+    def resend_confirmation_code(self, identifier: str) -> Dict:
         """
         Resend email confirmation code to user.
         
         Args:
-            email: User email (used as Cognito username)
+            identifier: Username or email address
             
         Returns:
             Resend response
@@ -197,25 +245,33 @@ class CognitoAuthService:
             ClientError: If resend fails
         """
         try:
+            # Find the actual Cognito username
+            cognito_username = self._try_get_user_by_identifier(identifier)
+            if not cognito_username:
+                raise ClientError(
+                    {'Error': {'Code': 'UserNotFoundException'}},
+                    'ResendConfirmationCode'
+                )
+            
             response = self.client.resend_confirmation_code(
                 ClientId=self.client_id,
-                Username=email,
-                SecretHash=self._get_secret_hash(email),
+                Username=cognito_username,
+                SecretHash=self._get_secret_hash(cognito_username),
             )
-            logger.info(f"Confirmation code resent for {email}")
+            logger.info(f"Confirmation code resent for {identifier} (Cognito: {cognito_username})")
             return {
                 'code_delivery_details': response.get('CodeDeliveryDetails'),
             }
         except ClientError as e:
-            logger.error(f"Resend error for {email}: {e.response['Error']['Code']}")
+            logger.error(f"Resend error for {identifier}: {e.response['Error']['Code']}")
             raise
     
-    def forgot_password(self, email: str) -> Dict:
+    def forgot_password(self, identifier: str) -> Dict:
         """
         Initiate password reset flow.
         
         Args:
-            email: User email address
+            identifier: Username or email address
             
         Returns:
             Password reset response
@@ -224,22 +280,30 @@ class CognitoAuthService:
             ClientError: If forgot password fails
         """
         try:
+            # Find the actual Cognito username
+            cognito_username = self._try_get_user_by_identifier(identifier)
+            if not cognito_username:
+                raise ClientError(
+                    {'Error': {'Code': 'UserNotFoundException'}},
+                    'ForgotPassword'
+                )
+            
             response = self.client.forgot_password(
                 ClientId=self.client_id,
-                Username=email,
-                SecretHash=self._get_secret_hash(email),
+                Username=cognito_username,
+                SecretHash=self._get_secret_hash(cognito_username),
             )
-            logger.info(f"Password reset initiated for {email}")
+            logger.info(f"Password reset initiated for {identifier} (Cognito: {cognito_username})")
             return {
                 'code_delivery_details': response.get('CodeDeliveryDetails'),
             }
         except ClientError as e:
-            logger.error(f"Forgot password error for {email}: {e.response['Error']['Code']}")
+            logger.error(f"Forgot password error for {identifier}: {e.response['Error']['Code']}")
             raise
     
     def confirm_forgot_password(
         self,
-        email: str,
+        identifier: str,
         confirmation_code: str,
         new_password: str,
     ) -> Dict:
@@ -247,7 +311,7 @@ class CognitoAuthService:
         Confirm password reset with new password.
         
         Args:
-            email: User email (used as Cognito username)
+            identifier: Username or email address
             confirmation_code: Password reset code
             new_password: New password
             
@@ -258,17 +322,25 @@ class CognitoAuthService:
             ClientError: If password reset fails
         """
         try:
+            # Find the actual Cognito username
+            cognito_username = self._try_get_user_by_identifier(identifier)
+            if not cognito_username:
+                raise ClientError(
+                    {'Error': {'Code': 'UserNotFoundException'}},
+                    'ConfirmForgotPassword'
+                )
+            
             self.client.confirm_forgot_password(
                 ClientId=self.client_id,
-                Username=email,
+                Username=cognito_username,
                 ConfirmationCode=confirmation_code,
                 Password=new_password,
-                SecretHash=self._get_secret_hash(email),
+                SecretHash=self._get_secret_hash(cognito_username),
             )
-            logger.info(f"Password reset confirmed for {email}")
+            logger.info(f"Password reset confirmed for {identifier} (Cognito: {cognito_username})")
             return {'message': 'Password reset successfully'}
         except ClientError as e:
-            logger.error(f"Confirm forgot password error for {email}: {e.response['Error']['Code']}")
+            logger.error(f"Confirm forgot password error for {identifier}: {e.response['Error']['Code']}")
             raise
     
     def get_user(self, access_token: str) -> Dict:

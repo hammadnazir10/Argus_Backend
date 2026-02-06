@@ -109,7 +109,7 @@ async def confirm_email(request: ConfirmEmailRequest):
     Confirm user email address with verification code.
     
     **Request Body:**
-    - username: The registered username
+    - username: Username or email address 
     - confirmation_code: 6-digit code received via email
     
     **Response:**
@@ -121,7 +121,7 @@ async def confirm_email(request: ConfirmEmailRequest):
         logger.info(f"Processing email confirmation for username: {request.username}")
         
         result = cognito_service.confirm_sign_up(
-            email=request.username,
+            identifier=request.username,
             confirmation_code=request.confirmation_code,
         )
         
@@ -155,7 +155,7 @@ async def resend_confirmation_code(request: ResendConfirmationCodeRequest):
     Resend email confirmation code to user.
     
     **Request Body:**
-    - username: The registered username
+    - username: Username or email address
     
     **Response:**
     - message: Confirmation code resent message
@@ -167,7 +167,7 @@ async def resend_confirmation_code(request: ResendConfirmationCodeRequest):
         logger.info(f"Resending confirmation code for username: {request.username}")
         
         result = cognito_service.resend_confirmation_code(
-            email=request.username,
+            identifier=request.username,
         )
         
         return ResendConfirmationCodeResponse(
@@ -205,10 +205,10 @@ async def resend_confirmation_code(request: ResendConfirmationCodeRequest):
 )
 async def sign_in(request: SignInRequest):
     """
-    Authenticate user with email (as username) and password.
+    Authenticate user with username or email and password.
     
     **Request Body:**
-    - username: The user's email address (email is used as Cognito username)
+    - username: Username or email address
     - password: User password
     
     **Response:**
@@ -218,16 +218,16 @@ async def sign_in(request: SignInRequest):
     
     **Important:** 
     - User must have confirmed email before signing in
-    - Email address is used as the Cognito username
+    - Can use either username or email address for authentication
     - Include access_token in Authorization header for protected endpoints
     - Access token expires in 1 hour by default
     - Use refresh_token to get new tokens without re-authenticating
     """
     try:
-        logger.info(f"Processing signin request for email: {request.username}")
+        logger.info(f"Processing signin request for: {request.username}")
         
         auth_result = cognito_service.initiate_auth(
-            username=request.username,
+            identifier=request.username,
             password=request.password,
         )
         
@@ -282,10 +282,10 @@ async def forgot_password(request: ForgotPasswordRequest):
     **Note:** User will receive password reset code via email.
     """
     try:
-        logger.info(f"Processing forgot password request for email: {request.email}")
+        logger.info(f"Processing forgot password request for: {request.identifier}")
         
         result = cognito_service.forgot_password(
-            email=request.email,
+            identifier=request.identifier,
         )
         
         return ForgotPasswordResponse(
@@ -294,7 +294,7 @@ async def forgot_password(request: ForgotPasswordRequest):
         )
         
     except ClientError as e:
-        logger.error(f"Forgot password failed for {request.email}: {str(e)}")
+        logger.error(f"Forgot password failed for {request.identifier}: {str(e)}") 
         raise handle_cognito_error(e, context="forgot_password")
     except Exception as e:
         logger.error(f"Unexpected error during forgot password: {str(e)}")
@@ -321,7 +321,7 @@ async def confirm_forgot_password(request: ConfirmForgotPasswordRequest):
     Confirm password reset with verification code and new password.
     
     **Request Body:**
-    - email: The registered email address
+    - identifier: Username or email address
     - confirmation_code: 6-digit code received via email
     - new_password: New password (minimum 8 characters)
     
@@ -331,10 +331,10 @@ async def confirm_forgot_password(request: ConfirmForgotPasswordRequest):
     **Note:** User can sign in with new password after confirmation.
     """
     try:
-        logger.info(f"Processing confirm forgot password for email: {request.email}")
+        logger.info(f"Processing confirm forgot password for: {request.identifier}")
         
         result = cognito_service.confirm_forgot_password(
-            email=request.email,
+            identifier=request.identifier,
             confirmation_code=request.confirmation_code,
             new_password=request.new_password,
         )
@@ -342,7 +342,7 @@ async def confirm_forgot_password(request: ConfirmForgotPasswordRequest):
         return ConfirmForgotPasswordResponse(**result)
         
     except ClientError as e:
-        logger.error(f"Confirm forgot password failed for {request.email}: {str(e)}")
+        logger.error(f"Confirm forgot password failed for {request.identifier}: {str(e)}")
         raise handle_cognito_error(e, context="confirm_forgot_password")
     except Exception as e:
         logger.error(f"Unexpected error during confirm forgot password: {str(e)}")

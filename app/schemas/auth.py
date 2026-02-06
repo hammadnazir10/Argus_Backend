@@ -40,13 +40,13 @@ class SignUpResponse(BaseModel):
 
 class ConfirmEmailRequest(BaseModel):
     """Email confirmation request."""
-    username: str = Field(..., min_length=3, max_length=128)
+    username: str = Field(..., min_length=3, max_length=128, description="Username or email address")
     confirmation_code: str = Field(..., min_length=6, max_length=6)
     
     class Config:
         json_schema_extra = {
             "example": {
-                "username": "hammadnazir",
+                "username": "hammadnazir or hammadnazir106@gmail.com",
                 "confirmation_code": "123456",
             }
         }
@@ -59,12 +59,12 @@ class ConfirmEmailResponse(BaseModel):
 
 class ResendConfirmationCodeRequest(BaseModel):
     """Resend confirmation code request."""
-    username: str = Field(..., min_length=3, max_length=128)
+    username: str = Field(..., min_length=3, max_length=128, description="Username or email address")
     
     class Config:
         json_schema_extra = {
             "example": {
-                "username": "hammadnazir",
+                "username": "hammadnazir or hammadnazir106@gmail.com",
             }
         }
 
@@ -81,13 +81,13 @@ class ResendConfirmationCodeResponse(BaseModel):
 
 class SignInRequest(BaseModel):
     """User signin request."""
-    username: str = Field(..., min_length=3, max_length=128)
+    username: str = Field(..., min_length=3, max_length=128, description="Username or email address")
     password: str = Field(...)
     
     class Config:
         json_schema_extra = {
             "example": {
-                "username": "john_doe",
+                "username": "john_doe or john@example.com",
                 "password": "SecurePassword123!",
             }
         }
@@ -115,12 +115,12 @@ class SignInResponse(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     """Forgot password request."""
-    email: EmailStr
+    identifier: str = Field(..., min_length=3, max_length=128, description="Username or email address")
     
     class Config:
         json_schema_extra = {
             "example": {
-                "email": "john@example.com",
+                "identifier": "john_doe or john@example.com",
             }
         }
 
@@ -133,14 +133,14 @@ class ForgotPasswordResponse(BaseModel):
 
 class ConfirmForgotPasswordRequest(BaseModel):
     """Confirm forgot password request."""
-    email: EmailStr
+    identifier: str = Field(..., min_length=3, max_length=128, description="Username or email address")
     confirmation_code: str = Field(..., min_length=6, max_length=6)
     new_password: str = Field(..., min_length=8)
     
     class Config:
         json_schema_extra = {
             "example": {
-                "email": "john@example.com",
+                "identifier": "john_doe or john@example.com",
                 "confirmation_code": "123456",
                 "new_password": "NewPassword123!",
             }
