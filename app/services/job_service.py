@@ -300,8 +300,12 @@ class JobService:
             ValueError: If file is invalid or job not found
             HTTPException: If upload fails
         """
-        # Verify job exists and user owns it
-        job = await self.get_job_by_id(job_id, user_id)
+        # Verify job exists - skip user ownership verification if anonymous
+        if user_id == "anonymous":
+            job = await self.get_job_by_id(job_id)
+        else:
+            job = await self.get_job_by_id(job_id, user_id)
+        
         if not job:
             raise ValueError(f"Job {job_id} not found")
         

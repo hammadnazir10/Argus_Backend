@@ -13,6 +13,7 @@ alembic
 python-jose[cryptography]
 passlib[bcrypt]
 bcrypt
+pyjwt
 
 # Validation & Settings
 pydantic

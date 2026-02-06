@@ -15,7 +15,18 @@ class JobBase(BaseModel):
     @classmethod
     def parse_due_date(cls, value):
         if isinstance(value, str):
-            return datetime.strptime(value, "%Y-%m-%d %I:%M:%S %p")
+            try:
+                # Handle ISO format (2026-02-05T11:00:00)
+                if 'T' in value:
+                    return datetime.fromisoformat(value.replace('Z', '+00:00'))
+                # Handle date only format (2026-02-05)
+                elif len(value) == 10 and value.count('-') == 2:
+                    return datetime.strptime(value, "%Y-%m-%d")
+                # Handle datetime with space separator (2026-02-05 11:00:00)
+                else:
+                    return datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"Invalid date format: {value}. Expected ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD HH:MM:SS")
         return value
 
 class JobCreate(JobBase):

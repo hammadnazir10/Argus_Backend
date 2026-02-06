@@ -36,16 +36,21 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     
     # AWS Configuration
-    AWS_REGION: str = "us-east-1"
-    AWS_ACCESS_KEY_ID: str = ""
-    AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_REGION: str
+    AWS_ACCESS_KEY_ID: str
+    AWS_SECRET_ACCESS_KEY: str
     
     # S3 Configuration
-    S3_BUCKET_NAME: str = "argus-user-uploads-dev"
-    S3_UPLOAD_FOLDER: str = "uploads"
+    S3_BUCKET_NAME: str
+    S3_UPLOAD_FOLDER: str
     
     # DynamoDB Configuration
-    DYNAMODB_JOBS_TABLE: str = "argus-jobs"
+    DYNAMODB_JOBS_TABLE: str
+    
+    # Cognito Configuration
+    COGNITO_USER_POOL_ID: str
+    COGNITO_CLIENT_ID: str
+    COGNITO_CLIENT_SECRET: str
     
     class Config:
         env_file = ".env"
