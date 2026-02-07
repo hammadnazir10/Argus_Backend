@@ -316,6 +316,24 @@ def sanitize_project_name(project_name: str) -> str:
     return sanitized[:50].lower()
 
 
+def get_job_root_folder(job_id: str, project_name: str = None) -> str:
+    """
+    Generate root job folder path.
+    
+    Args:
+        job_id: Job ID
+        project_name: Optional project name for folder structure
+        
+    Returns:
+        Folder path in format: {job_id}_{project_name}
+    """
+    if project_name:
+        sanitized_name = sanitize_project_name(project_name)
+        return f"{job_id}_{sanitized_name}"
+    else:
+        return job_id
+
+
 def get_bom_folder_path(job_id: str, project_name: str = None) -> str:
     """
     Generate BOM folder path for storing all BOM files.
@@ -325,16 +343,10 @@ def get_bom_folder_path(job_id: str, project_name: str = None) -> str:
         project_name: Optional project name for folder structure
         
     Returns:
-        Folder path in format: {job_id}_{project_name}/bom/
+        Folder path in format: {job_id}_{project_name}/bom
     """
-    # Create folder name with job_id and project_name
-    if project_name:
-        sanitized_name = sanitize_project_name(project_name)
-        folder_name = f"{job_id}_{sanitized_name}"
-    else:
-        folder_name = job_id
-    
-    return f"{folder_name}/bom/"
+    folder_name = get_job_root_folder(job_id, project_name)
+    return f"{folder_name}/bom"
 
 
 def get_s3_key_for_bom(job_id: str, filename: str, project_name: str = None) -> str:
@@ -355,7 +367,7 @@ def get_s3_key_for_bom(job_id: str, filename: str, project_name: str = None) -> 
     # Create BOM filename with job_id prefix and original filename
     bom_filename = f"{job_id}_bom_{filename}"
     
-    return f"{bom_folder}{bom_filename}"
+    return f"{bom_folder}/{bom_filename}"
 
 
 def get_quotes_folder_path(job_id: str, project_name: str = None) -> str:
@@ -367,16 +379,10 @@ def get_quotes_folder_path(job_id: str, project_name: str = None) -> str:
         project_name: Optional project name for folder structure
         
     Returns:
-        Folder path in format: {job_id}_{project_name}/quotes/
+        Folder path in format: {job_id}_{project_name}/quotes
     """
-    # Create folder name with job_id and project_name
-    if project_name:
-        sanitized_name = sanitize_project_name(project_name)
-        folder_name = f"{job_id}_{sanitized_name}"
-    else:
-        folder_name = job_id
-    
-    return f"{folder_name}/quotes/"
+    folder_name = get_job_root_folder(job_id, project_name)
+    return f"{folder_name}/quotes"
 
 
 def get_s3_key_for_quote(job_id: str, filename: str, project_name: str = None) -> str:
@@ -397,7 +403,7 @@ def get_s3_key_for_quote(job_id: str, filename: str, project_name: str = None) -
     # Create quote filename with job_id prefix and original filename
     quote_filename = f"{job_id}_quote_{filename}"
     
-    return f"{quotes_folder}{quote_filename}"
+    return f"{quotes_folder}/{quote_filename}"
 
 
 async def create_s3_job_folder(job_id: str, project_name: str = None) -> bool:
@@ -412,13 +418,7 @@ async def create_s3_job_folder(job_id: str, project_name: str = None) -> bool:
         True if successful, False otherwise
     """
     try:
-        # Create folder name with job_id and project_name
-        if project_name:
-            sanitized_name = sanitize_project_name(project_name)
-            folder_name = f"{job_id}_{sanitized_name}"
-        else:
-            folder_name = job_id
-            
+        folder_name = get_job_root_folder(job_id, project_name)
         placeholder_key = f"{folder_name}/.placeholder"
         await s3_manager.upload_file(
             file_content=b"",
