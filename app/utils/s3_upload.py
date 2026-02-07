@@ -316,6 +316,27 @@ def sanitize_project_name(project_name: str) -> str:
     return sanitized[:50].lower()
 
 
+def get_bom_folder_path(job_id: str, project_name: str = None) -> str:
+    """
+    Generate BOM folder path for storing all BOM files.
+    
+    Args:
+        job_id: Job ID
+        project_name: Optional project name for folder structure
+        
+    Returns:
+        Folder path in format: {job_id}_{project_name}/bom/
+    """
+    # Create folder name with job_id and project_name
+    if project_name:
+        sanitized_name = sanitize_project_name(project_name)
+        folder_name = f"{job_id}_{sanitized_name}"
+    else:
+        folder_name = job_id
+    
+    return f"{folder_name}/bom/"
+
+
 def get_s3_key_for_bom(job_id: str, filename: str, project_name: str = None) -> str:
     """
     Generate S3 key for BOM file as per Story 1.2 requirements.
@@ -326,15 +347,28 @@ def get_s3_key_for_bom(job_id: str, filename: str, project_name: str = None) -> 
         project_name: Optional project name for folder structure
         
     Returns:
-        S3 key in format: {job_id}_{project_name}/bom.xlsm
+        S3 key in format: {job_id}_{project_name}/bom/{job_id}_bom_{original_filename}
     """
-    # Extract file extension
-    file_ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else 'xlsx'
+    # Get the BOM folder path
+    bom_folder = get_bom_folder_path(job_id, project_name)
     
-    # Ensure extension is valid for BOM
-    if file_ext not in ['xlsm', 'xlsx']:
-        file_ext = 'xlsm'  # Default to xlsm as per story requirements
+    # Create BOM filename with job_id prefix and original filename
+    bom_filename = f"{job_id}_bom_{filename}"
     
+    return f"{bom_folder}{bom_filename}"
+
+
+def get_quotes_folder_path(job_id: str, project_name: str = None) -> str:
+    """
+    Generate quotes folder path for storing all quote files.
+    
+    Args:
+        job_id: Job ID
+        project_name: Optional project name for folder structure
+        
+    Returns:
+        Folder path in format: {job_id}_{project_name}/quotes/
+    """
     # Create folder name with job_id and project_name
     if project_name:
         sanitized_name = sanitize_project_name(project_name)
@@ -342,32 +376,28 @@ def get_s3_key_for_bom(job_id: str, filename: str, project_name: str = None) -> 
     else:
         folder_name = job_id
     
-    return f"{folder_name}/bom.{file_ext}"
+    return f"{folder_name}/quotes/"
 
 
-def get_s3_key_for_quote(job_id: str, filename: str, quote_index: int, project_name: str = None) -> str:
+def get_s3_key_for_quote(job_id: str, filename: str, project_name: str = None) -> str:
     """
     Generate S3 key for quote file.
     
     Args:
         job_id: Job ID
         filename: Original filename
-        quote_index: Index of the quote file (1-based)
         project_name: Optional project name for folder structure
         
     Returns:
-        S3 key in format: {job_id}_{project_name}/quote-{n}.{ext}
+        S3 key in format: {job_id}_{project_name}/quotes/{job_id}_quote_{original_filename}
     """
-    file_ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else 'pdf'
+    # Get the quotes folder path
+    quotes_folder = get_quotes_folder_path(job_id, project_name)
     
-    # Create folder name with job_id and project_name
-    if project_name:
-        sanitized_name = sanitize_project_name(project_name)
-        folder_name = f"{job_id}_{sanitized_name}"
-    else:
-        folder_name = job_id
+    # Create quote filename with job_id prefix and original filename
+    quote_filename = f"{job_id}_quote_{filename}"
     
-    return f"{folder_name}/quote-{quote_index}.{file_ext}"
+    return f"{quotes_folder}{quote_filename}"
 
 
 async def create_s3_job_folder(job_id: str, project_name: str = None) -> bool:

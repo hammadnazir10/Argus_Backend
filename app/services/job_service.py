@@ -3,6 +3,7 @@ import re
 import os
 import asyncio
 import tempfile
+import warnings
 from typing import Optional, List, Tuple, Callable
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,11 +16,11 @@ from app.utils.file_upload import (
     validate_file_extension, validate_file_magic_number,
     ALLOWED_BOM_EXTENSIONS, ALLOWED_QUOTE_EXTENSIONS,
     MAX_BOM_FILE_SIZE, MAX_QUOTE_FILE_SIZE,
-    validate_bom_columns, sanitize_filename
+    sanitize_filename
 )
 from app.utils.s3_upload import (
     s3_manager, get_s3_key_for_bom, get_s3_key_for_quote, 
-    create_s3_job_folder
+    create_s3_job_folder, get_bom_folder_path, get_quotes_folder_path
 )
 
 
@@ -333,18 +334,24 @@ class JobService:
         if not validate_file_magic_number(file_content, file_ext):
             raise ValueError("File appears to be corrupted or not a valid Excel file")
         
-        # Create temporary file for validation
+        # Count rows in Excel file for response (without column validation)
         row_count = 0
         try:
             with tempfile.NamedTemporaryFile(suffix=f'.{file_ext}', delete=False) as temp_file:
                 temp_file.write(file_content)
                 temp_file.flush()
                 
-                # Validate BOM columns
+                # Count rows in Excel file
                 try:
-                    row_count = validate_bom_columns(temp_file.name)
+                    import pandas as pd
+                    # Suppress openpyxl warning about header/footer parsing
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore", UserWarning)
+                        df = pd.read_excel(temp_file.name, engine='openpyxl')
+                    row_count = len(df)
                 except Exception as e:
-                    raise ValueError(f"BOM validation failed: {str(e)}")
+                    # If row counting fails, default to 0 but don't block upload
+                    row_count = 0
                 finally:
                     # Clean up temporary file
                     try:
@@ -372,8 +379,11 @@ class JobService:
                 detail=f"Failed to upload file to S3: {str(e)}"
             )
         
-        # Update job with BOM file key
-        job.bom_file_key = s3_key
+        # Update job with BOM folder path (only store folder, not individual file paths)
+        if not job.bom_file_key:
+            bom_folder_path = get_bom_folder_path(job_id, job.project_name)
+            job.bom_file_key = bom_folder_path
+        
         job.status = "bom_uploaded"  # Update status to indicate BOM uploaded
         
         try:
@@ -430,7 +440,6 @@ class JobService:
             raise ValueError("Maximum 15 quote files allowed")
         
         uploaded_files = []
-        quote_file_keys = job.quote_file_keys or []
         
         try:
             for i, file in enumerate(files):
@@ -460,8 +469,7 @@ class JobService:
                 
                 # Generate S3 key for quote file
                 sanitized_filename = sanitize_filename(file.filename)
-                quote_index = i + len(quote_file_keys) + 1
-                s3_key = get_s3_key_for_quote(job_id, sanitized_filename, quote_index, job.project_name)
+                s3_key = get_s3_key_for_quote(job_id, sanitized_filename, job.project_name)
                 
                 # Upload to S3
                 try:
@@ -476,9 +484,6 @@ class JobService:
                         detail=f"Failed to upload file '{file.filename}' to S3: {str(e)}"
                     )
                 
-                # Add to quote file keys
-                quote_file_keys.append(s3_key)
-                
                 uploaded_files.append({
                     "filename": sanitized_filename,
                     "original_filename": file.filename,
@@ -490,8 +495,11 @@ class JobService:
                     "etag": upload_result.get("etag")
                 })
             
-            # Update job with new quote file keys
-            job.quote_file_keys = quote_file_keys
+            # Update job with quotes folder path (only store folder, not individual file paths)
+            if not job.quote_file_keys or len(job.quote_file_keys) == 0:
+                quotes_folder_path = get_quotes_folder_path(job_id, job.project_name)
+                job.quote_file_keys = [quotes_folder_path]
+            
             job.status = "quotes_uploaded"  # Update status to indicate quotes uploaded
             
             try:

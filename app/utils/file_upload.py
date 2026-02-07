@@ -201,48 +201,6 @@ def validate_file_magic_number(file_bytes: bytes, file_ext: str) -> bool:
     return False
 
 
-def validate_bom_columns(file_path: str) -> int:
-    """
-    Validate BOM file has required columns and return row count.
-    
-    Args:
-        file_path: Path to the BOM file
-        
-    Returns:
-        Number of data rows in the BOM file
-        
-    Raises:
-        ValueError: If required columns are missing or file is invalid
-    """
-    try:
-        import pandas as pd
-        
-        # Read Excel file
-        df = pd.read_excel(file_path, engine='openpyxl')
-        
-        # Required columns for BOM validation
-        required_columns = ['Size', 'Description', 'Manufacturer', 'Count']
-        
-        # Check for required columns (case-insensitive)
-        df_columns = [col.strip().lower() for col in df.columns]
-        missing_columns = []
-        
-        for req_col in required_columns:
-            if req_col.lower() not in df_columns:
-                missing_columns.append(req_col)
-        
-        if missing_columns:
-            raise ValueError(f"BOM file missing required columns: {', '.join(missing_columns)}")
-        
-        # Return number of data rows (excluding header)
-        return len(df)
-        
-    except pd.errors.EmptyDataError:
-        raise ValueError("BOM file is empty")
-    except pd.errors.ParserError as e:
-        raise ValueError(f"BOM file format is invalid: {str(e)}")
-    except Exception as e:
-        raise ValueError(f"BOM file validation error: {str(e)}")
 
 
 def sanitize_filename(filename: str) -> str:
