@@ -21,14 +21,6 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = ""
     
-    
-    @property
-    def cors_origins(self) -> List[str]:
-        """Parse CORS origins from string."""
-        if isinstance(self.BACKEND_CORS_ORIGINS, str):
-            return [i.strip() for i in self.BACKEND_CORS_ORIGINS.split(",")]
-        return self.BACKEND_CORS_ORIGINS
-    
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
