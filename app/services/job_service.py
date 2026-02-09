@@ -411,6 +411,153 @@ class JobService:
             "etag": upload_result.get("etag")
         }
     
+    async def upload_bom_files(self, job_id: str, user_id: str, files: List[UploadFile]) -> dict:
+        """
+        Handle multiple BOM file uploads for a job.
+        
+        Args:
+            job_id: Job ID
+            user_id: User ID for ownership verification
+            files: List of uploaded BOM files
+            
+        Returns:
+            Dict with upload details
+            
+        Raises:
+            ValueError: If files are invalid or job not found
+            HTTPException: If upload fails
+        """
+        # Verify job exists - skip user ownership verification if anonymous
+        if user_id == "anonymous":
+            job = await self.get_job_by_id(job_id)
+        else:
+            job = await self.get_job_by_id(job_id, user_id)
+        
+        if not job:
+            raise ValueError(f"Job {job_id} not found")
+        
+        if len(files) > 10:
+            raise ValueError("Maximum 10 BOM files allowed")
+        
+        uploaded_files = []
+        
+        try:
+            for i, file in enumerate(files):
+                # Validate file extension
+                if not validate_file_extension(file.filename, ALLOWED_BOM_EXTENSIONS):
+                    raise ValueError(f"Invalid file type for '{file.filename}'. BOM files must be one of: {', '.join(ALLOWED_BOM_EXTENSIONS)}")
+                
+                # Read file content
+                try:
+                    file_content = await file.read()
+                except Exception as e:
+                    raise ValueError(f"Failed to read file '{file.filename}': {str(e)}")
+                
+                # Check file size
+                file_size = len(file_content)
+                if file_size == 0:
+                    raise ValueError(f"File '{file.filename}' is empty")
+                
+                if file_size > MAX_BOM_FILE_SIZE:
+                    max_size_mb = MAX_BOM_FILE_SIZE // (1024 * 1024)
+                    raise ValueError(f"File '{file.filename}' exceeds maximum limit of {max_size_mb}MB")
+                
+                # Validate file magic number
+                file_ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+                if not validate_file_magic_number(file_content, file_ext):
+                    raise ValueError(f"File '{file.filename}' appears to be corrupted or not a valid Excel file")
+                
+                # Count rows in Excel file for response
+                row_count = 0
+                try:
+                    with tempfile.NamedTemporaryFile(suffix=f'.{file_ext}', delete=False) as temp_file:
+                        temp_file.write(file_content)
+                        temp_file.flush()
+                        
+                        # Count rows in Excel file
+                        try:
+                            import pandas as pd
+                            # Suppress openpyxl warning about header/footer parsing
+                            with warnings.catch_warnings():
+                                warnings.simplefilter("ignore", UserWarning)
+                                df = pd.read_excel(temp_file.name, engine='openpyxl')
+                            row_count = len(df)
+                        except Exception as e:
+                            # If row counting fails, default to 0 but don't block upload
+                            row_count = 0
+                        finally:
+                            # Clean up temporary file
+                            try:
+                                os.unlink(temp_file.name)
+                            except:
+                                pass
+                except (OSError, IOError) as e:
+                    raise ValueError(f"File processing failed for '{file.filename}': {str(e)}")
+                
+                # Generate S3 key for BOM file
+                sanitized_filename = sanitize_filename(file.filename)
+                s3_key = get_s3_key_for_bom(job_id, sanitized_filename, job.project_name)
+                
+                # Upload to S3
+                try:
+                    upload_result = await s3_manager.upload_file(
+                        file_content=file_content,
+                        file_key=s3_key,
+                        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to upload file '{file.filename}' to S3: {str(e)}"
+                    )
+                
+                uploaded_files.append({
+                    "filename": sanitized_filename,
+                    "original_filename": file.filename,
+                    "file_key": s3_key,
+                    "row_count": row_count,
+                    "file_size": file_size,
+                    "s3_url": upload_result.get("s3_url"),
+                    "upload_id": upload_result.get("upload_id"),
+                    "etag": upload_result.get("etag")
+                })
+            
+            # Update job with BOM folder path (only store folder, not individual file paths)
+            if not job.bom_file_key:
+                bom_folder_path = get_bom_folder_path(job_id, job.project_name)
+                job.bom_file_key = bom_folder_path
+            
+            job.status = "bom_uploaded"  # Update status to indicate BOM uploaded
+            
+            try:
+                await self.db.commit()
+                await self.db.refresh(job)
+            except Exception as e:
+                # Try to clean up S3 files if database update fails
+                for file_info in uploaded_files:
+                    try:
+                        await s3_manager.delete_file(file_info["file_key"])
+                    except:
+                        pass
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to update job: {str(e)}"
+                )
+            
+            return {
+                "job_id": job_id,
+                "uploaded_files": uploaded_files,
+                "total_files": len(uploaded_files)
+            }
+        except (ValueError, HTTPException) as e:
+            # Clean up any files that were already uploaded
+            for file_info in uploaded_files:
+                try:
+                    await s3_manager.delete_file(file_info["file_key"])
+                except:
+                    pass
+            raise
+    
     async def upload_quote_files(self, job_id: str, user_id: str, files: List[UploadFile]) -> dict:
         """
         Handle multiple quote file uploads for a job (Story 1.3).
@@ -436,8 +583,8 @@ class JobService:
         if not job:
             raise ValueError(f"Job {job_id} not found")
         
-        if len(files) > 15:
-            raise ValueError("Maximum 15 quote files allowed")
+        if len(files) > 30:
+            raise ValueError("Maximum 30 quote files allowed")
         
         uploaded_files = []
         

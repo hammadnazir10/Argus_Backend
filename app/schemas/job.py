@@ -99,10 +99,8 @@ class JobStatusResponse(BaseModel):
 class BOMUploadResponse(BaseModel):
     """Response for successful BOM file upload."""
     job_id: str = Field(..., description="Job ID")
-    filename: str = Field(..., description="Original filename")
-    file_key: str = Field(..., description="Storage file key/path")
-    row_count: Optional[int] = Field(None, description="Number of rows in BOM file")
-    file_size: int = Field(..., description="File size in bytes")
+    uploaded_files: List[dict] = Field(..., description="List of uploaded BOM file details")
+    total_files: int = Field(..., description="Total number of BOM files uploaded")
 
 
 class QuoteUploadResponse(BaseModel):

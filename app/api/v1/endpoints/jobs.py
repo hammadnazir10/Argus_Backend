@@ -70,24 +70,24 @@ async def get_job_status(job_id: str, user: dict = Depends(get_current_user), db
 
 
 @router.post("/{job_id}/upload-bom", response_model=ResponseModel[BOMUploadResponse], status_code=status.HTTP_201_CREATED)
-async def upload_bom_file(job_id: str, file: UploadFile = File(..., description="BOM file (.xlsm or .xlsx format)"), user: dict = Depends(get_current_user), db = Depends(get_database)) -> dict:
-    """Upload BOM file for a job."""
+async def upload_bom_files(job_id: str, files: List[UploadFile] = File(..., description="BOM files (.xlsm or .xlsx format)"), user: dict = Depends(get_current_user), db = Depends(get_database)) -> dict:
+    """Upload multiple BOM files for a job."""
     try:
         job_service = JobService(db)
-        result = await job_service.upload_bom_file(job_id=job_id, user_id=user["username"], file=file)
+        result = await job_service.upload_bom_files(job_id=job_id, user_id=user["username"], files=files)
         return {
             "success": True,
-            "message": f"BOM file '{result['filename']}' uploaded successfully with {result['row_count']} rows",
+            "message": f"Successfully uploaded {result['total_files']} BOM file(s)",
             "data": BOMUploadResponse(**result)
         }
     except (HTTPException, ValueError) as e:
         raise HTTPException(status_code=getattr(e, 'status_code', status.HTTP_400_BAD_REQUEST), detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to upload BOM file: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to upload BOM files: {str(e)}")
 
 
 @router.post("/{job_id}/upload-quotes", response_model=ResponseModel[QuoteUploadResponse], status_code=status.HTTP_201_CREATED)
-async def upload_quote_files(job_id: str, files: List[UploadFile] = File(..., description="Quote files (.pdf, .xlsx, .xlsm, .csv formats)"), user: dict = Depends(get_current_user), db = Depends(get_database)) -> dict:
+async def upload_quote_files(job_id: str, files: List[UploadFile] = File(..., description="Quote files (.pdf, .xlsx, .xlsm, .csv formats) - Max 30 files"), user: dict = Depends(get_current_user), db = Depends(get_database)) -> dict:
     """Upload multiple quote files for a job (Story 1.3)."""
     try:
         job_service = JobService(db)
