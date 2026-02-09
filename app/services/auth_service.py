@@ -82,15 +82,13 @@ class CognitoAuthService:
         self,
         email: str,
         password: str,
-        username: str,
     ) -> Dict:
         """
         Register a new user in Cognito.
         
         Args:
-            email: User email address
+            email: User email address (used as Cognito username)
             password: User password
-            username: Custom username (used as Cognito username)
             
         Returns:
             Cognito signup response
@@ -101,7 +99,7 @@ class CognitoAuthService:
         try:
             response = self.client.sign_up(
                 ClientId=self.client_id,
-                Username=username,  # Use the custom username as Cognito username
+                Username=email,  # Use email as the Cognito username
                 Password=password,
                 UserAttributes=[
                     {
@@ -109,12 +107,11 @@ class CognitoAuthService:
                         'Value': email,
                     },
                 ],
-                SecretHash=self._get_secret_hash(username),  # SecretHash based on username
+                SecretHash=self._get_secret_hash(email),  # SecretHash based on email
             )
-            logger.info(f"User {username} ({email}) signed up successfully")
+            logger.info(f"User {email} signed up successfully")
             return {
                 'user_sub': response['UserSub'],
-                'username': username,
                 'email': email,
                 'code_delivery_details': response.get('CodeDeliveryDetails'),
             }
@@ -348,14 +345,14 @@ class CognitoAuthService:
     # Enhanced Methods for Endpoints (with full error handling)
     # ============================================================================
     
-    def handle_signup(self, username: str, email: str, password: str) -> dict:
+    def handle_signup(self, email: str, password: str) -> dict:
         """Handle user signup with full error handling."""
         try:
-            logger.info(f"Processing signup request for username: {username}")
-            result = self.sign_up(email=email, password=password, username=username)
+            logger.info(f"Processing signup request for email: {email}")
+            result = self.sign_up(email=email, password=password)
             return result
         except ClientError as e:
-            logger.error(f"Signup failed for {username}: {str(e)}")
+            logger.error(f"Signup failed for {email}: {str(e)}")
             raise handle_cognito_error(e, context="signup")
     
     def handle_confirm_email(self, identifier: str, confirmation_code: str) -> dict:
@@ -434,9 +431,11 @@ class CognitoAuthService:
             result = self.get_user(access_token=access_token)
             attributes = result.get('attributes', {})
             
+            # Email is the primary identifier (used as username in Cognito)
+            email = attributes.get('email') or result.get('username')
+            
             return {
-                'username': result.get('username'),
-                'email': attributes.get('email'),
+                'email': email,
                 'email_verified': attributes.get('email_verified', '').lower() == 'true',
                 'given_name': attributes.get('given_name'),
                 'family_name': attributes.get('family_name'),

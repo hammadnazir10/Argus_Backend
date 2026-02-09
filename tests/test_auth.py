@@ -9,7 +9,6 @@ async def test_register_user(client: AsyncClient):
         "/api/v1/auth/register",
         json={
             "email": "test@example.com",
-            "username": "testuser",
             "password": "testpassword123",
             "full_name": "Test User",
         },
@@ -17,7 +16,6 @@ async def test_register_user(client: AsyncClient):
     assert response.status_code == 201
     data = response.json()
     assert data["email"] == "test@example.com"
-    assert data["username"] == "testuser"
     assert "id" in data
 
 
@@ -26,12 +24,10 @@ async def test_register_duplicate_email(client: AsyncClient):
     """Test registration with duplicate email."""
     user_data = {
         "email": "duplicate@example.com",
-        "username": "user1",
         "password": "testpassword123",
     }
     await client.post("/api/v1/auth/register", json=user_data)
     
-    user_data["username"] = "user2"
     response = await client.post("/api/v1/auth/register", json=user_data)
     assert response.status_code == 400
 
@@ -44,7 +40,6 @@ async def test_login(client: AsyncClient):
         "/api/v1/auth/register",
         json={
             "email": "login@example.com",
-            "username": "loginuser",
             "password": "testpassword123",
         },
     )
@@ -53,7 +48,7 @@ async def test_login(client: AsyncClient):
     response = await client.post(
         "/api/v1/auth/login",
         data={
-            "username": "login@example.com",
+            "email": "login@example.com",
             "password": "testpassword123",
         },
     )
@@ -70,7 +65,7 @@ async def test_login_invalid_credentials(client: AsyncClient):
     response = await client.post(
         "/api/v1/auth/login",
         data={
-            "username": "nonexistent@example.com",
+            "email": "nonexistent@example.com",
             "password": "wrongpassword",
         },
     )

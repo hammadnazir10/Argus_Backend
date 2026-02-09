@@ -12,7 +12,6 @@ from typing import Optional, Dict, Any
 
 class SignUpRequest(BaseModel):
     """User signup request."""
-    username: str = Field(..., min_length=3, max_length=128)
     email: EmailStr
     password: str = Field(..., min_length=8)
 
@@ -20,7 +19,7 @@ class SignUpRequest(BaseModel):
 class SignUpResponse(BaseModel):
     """User signup response."""
     user_sub: str
-    username: str
+    email: str
     message: str = "User registered successfully. Please check your email for verification code."
     code_delivery_details: Optional[Dict[str, Any]] = None
 
@@ -31,7 +30,7 @@ class SignUpResponse(BaseModel):
 
 class ConfirmEmailRequest(BaseModel):
     """Email confirmation request."""
-    username: str = Field(..., min_length=3, max_length=128, description="Username or email address")
+    email: EmailStr = Field(..., description="Email address")
     confirmation_code: str = Field(..., min_length=6, max_length=6)
 
 
@@ -42,7 +41,7 @@ class ConfirmEmailResponse(BaseModel):
 
 class ResendConfirmationCodeRequest(BaseModel):
     """Resend confirmation code request."""
-    username: str = Field(..., min_length=3, max_length=128, description="Username or email address")
+    email: EmailStr = Field(..., description="Email address")
 
 
 class ResendConfirmationCodeResponse(BaseModel):
@@ -57,7 +56,7 @@ class ResendConfirmationCodeResponse(BaseModel):
 
 class SignInRequest(BaseModel):
     """User signin request."""
-    username: str = Field(..., min_length=3, max_length=128, description="Username or email address")
+    email: EmailStr = Field(..., description="Email address")
     password: str = Field(...)
 
 
@@ -83,7 +82,7 @@ class SignInResponse(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     """Forgot password request."""
-    identifier: str = Field(..., min_length=3, max_length=128, description="Username or email address")
+    email: EmailStr = Field(..., description="Email address")
 
 
 class ForgotPasswordResponse(BaseModel):
@@ -94,7 +93,7 @@ class ForgotPasswordResponse(BaseModel):
 
 class ConfirmForgotPasswordRequest(BaseModel):
     """Confirm forgot password request."""
-    identifier: str = Field(..., min_length=3, max_length=128, description="Username or email address")
+    email: EmailStr = Field(..., description="Email address")
     confirmation_code: str = Field(..., min_length=6, max_length=6)
     new_password: str = Field(..., min_length=8)
 
@@ -138,8 +137,7 @@ class RefreshTokenResponse(BaseModel):
 
 class UserProfileResponse(BaseModel):
     """User profile response."""
-    username: str
-    email: Optional[str] = None
+    email: str
     email_verified: Optional[bool] = None
     given_name: Optional[str] = None
     family_name: Optional[str] = None

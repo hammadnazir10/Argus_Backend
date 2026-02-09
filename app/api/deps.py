@@ -43,7 +43,7 @@ async def get_current_user(
     ```python
     @router.get("/profile")
     async def get_profile(user: dict = Depends(get_current_user)):
-        return {"username": user["username"]}
+        return {"email": user["email"]}
     ```
     """
     token = credentials.credentials
@@ -56,17 +56,18 @@ async def get_current_user(
             options={"verify_signature": False},
         )
         
-        username: str = payload.get("cognito:username") or payload.get("username")
-        if not username:
+        # Get email from token (Cognito uses email as username)
+        email: str = payload.get("email") or payload.get("cognito:username") or payload.get("username")
+        if not email:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token",
             )
         
         return {
-            "username": username,
+            "email": email,
+            "username": email,  # Keep for backward compatibility
             "sub": payload.get("sub"),
-            "email": payload.get("email"),
             "token": token,
         }
         
@@ -103,7 +104,7 @@ async def get_optional_user(
     @router.get("/public")
     async def public_endpoint(user: Optional[dict] = Depends(get_optional_user)):
         if user:
-            return {"message": f"Hello {user['username']}"}
+            return {"message": f"Hello {user['email']}"}
         return {"message": "Hello Guest"}
     ```
     """

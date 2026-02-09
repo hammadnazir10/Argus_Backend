@@ -6,7 +6,7 @@ async def get_auth_token(client: AsyncClient, email: str, password: str) -> str:
     """Helper function to get auth token."""
     response = await client.post(
         "/api/v1/auth/login",
-        data={"username": email, "password": password},
+        data={"email": email, "password": password},
     )
     return response.json()["access_token"]
 
@@ -19,7 +19,6 @@ async def test_get_current_user(client: AsyncClient):
         "/api/v1/auth/register",
         json={
             "email": "me@example.com",
-            "username": "meuser",
             "password": "testpassword123",
             "full_name": "Me User",
         },
@@ -36,7 +35,6 @@ async def test_get_current_user(client: AsyncClient):
     assert response.status_code == 200
     data = response.json()
     assert data["email"] == "me@example.com"
-    assert data["username"] == "meuser"
 
 
 @pytest.mark.asyncio
@@ -47,7 +45,6 @@ async def test_update_current_user(client: AsyncClient):
         "/api/v1/auth/register",
         json={
             "email": "update@example.com",
-            "username": "updateuser",
             "password": "testpassword123",
         },
     )
