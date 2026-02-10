@@ -61,7 +61,7 @@ async def get_job_status(job_id: str, user: dict = Depends(get_current_user), db
         job = await job_service.get_job_by_id(job_id=job_id, user_id=user["username"])
         if not job:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Job {job_id} not found")
-        data = JobStatusResponse(job_id=job.job_id, status=job.status, current_step=None, elapsed_time=None, estimated_time_remaining=None)
+        data = JobStatusResponse(job_id=job.job_id, status=job.status)
         return {"success": True, "message": "Job status retrieved successfully", "data": data}
     except HTTPException:
         raise

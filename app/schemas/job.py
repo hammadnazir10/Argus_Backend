@@ -94,9 +94,6 @@ class JobStatusResponse(BaseModel):
     """Response for job status polling."""
     job_id: str
     status: str
-    current_step: Optional[str] = Field(None, description="Current processing step")
-    elapsed_time: Optional[int] = Field(None, description="Elapsed time in seconds")
-    estimated_time_remaining: Optional[int] = Field(None, description="Estimated time remaining in seconds")
     error_message: Optional[str] = Field(None, description="Error message if status is failed")
 
 
