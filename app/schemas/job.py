@@ -99,6 +99,10 @@ class JobCreatedResponse(BaseModel):
     project_name: str
     created_at: datetime
     status: str = "draft"
+    bid_date: Optional[date] = None
+    bid_time: Optional[time] = None
+    client_name: Optional[str] = None
+    location: Optional[str] = None
 
 
 class JobStatusResponse(BaseModel):

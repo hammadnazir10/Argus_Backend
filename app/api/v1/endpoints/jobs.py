@@ -17,7 +17,9 @@ async def create_job(job_in: JobCreate, user: dict = Depends(get_current_user), 
         created_job = await job_service.create_job(user_id=user["username"], job_in=job_in)
         data = JobCreatedResponse(
             job_id=created_job.job_id, user_id=created_job.user_id,
-            project_name=created_job.project_name, created_at=created_job.created_at, status=created_job.status
+            project_name=created_job.project_name, created_at=created_job.created_at, status=created_job.status,
+            bid_date=created_job.bid_date, bid_time=created_job.bid_time,
+            client_name=created_job.client_name, location=created_job.location
         )
         return {"success": True, "message": "Job created successfully", "data": data}
     except ValueError as e:
