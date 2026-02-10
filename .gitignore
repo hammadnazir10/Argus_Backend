@@ -51,7 +51,6 @@ coverage.xml
 *.pot
 
 # Environments
-.env
 .venv
 env/
 venv/
@@ -61,7 +60,6 @@ venv.bak/
 
 # IDEs
 .idea/
-.vscode/
 *.swp
 *.swo
 
@@ -76,3 +74,5 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+config.bat
+node_modules
