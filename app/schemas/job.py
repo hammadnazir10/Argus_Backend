@@ -7,7 +7,7 @@ class JobBase(BaseModel):
     """Base job schema."""
     project_name: str = Field(..., min_length=1, max_length=100, description="Project name for the bid")
     bid_date: Optional[date] = Field(None, description="Optional bid date")
-    bid_time: Optional[time] = Field(None, description="Optional bid time")
+    bid_time: Optional[str] = Field(None, description="Optional bid time (e.g., '7:10 AM' or '14:30')")
     client_name: Optional[str] = Field(None, max_length=255, description="Client name for the project")
     location: Optional[str] = Field(None, max_length=255, description="Project location")
 
@@ -36,19 +36,32 @@ class JobBase(BaseModel):
     @classmethod
     def parse_bid_time(cls, value):
         if isinstance(value, str):
+            # Validate format but return as string to preserve AM/PM
+            value = value.strip()
             try:
-                # Handle ISO format time (14:30:00 or HH:MM:SS)
-                if len(value) == 8 and value.count(':') == 2:
-                    return datetime.strptime(value, "%H:%M:%S").time()
-                # Handle HH:MM format
-                elif len(value) == 5 and value.count(':') == 1:
-                    return datetime.strptime(value, "%H:%M").time()
+                # Try 12-hour format with AM/PM (7:10:00 AM or 7:10 AM)
+                if 'AM' in value.upper() or 'PM' in value.upper():
+                    # Handle H:MM:SS AM/PM format
+                    if value.count(':') == 2:
+                        datetime.strptime(value, "%I:%M:%S %p")
+                    # Handle H:MM AM/PM format
+                    elif value.count(':') == 1:
+                        datetime.strptime(value, "%I:%M %p")
+                    return value  # Return original string with AM/PM
+                # Handle 24-hour ISO format time (14:30:00 or HH:MM:SS)
+                elif value.count(':') == 2:
+                    datetime.strptime(value, "%H:%M:%S")
+                    return value
+                # Handle 24-hour HH:MM format
+                elif value.count(':') == 1:
+                    datetime.strptime(value, "%H:%M")
+                    return value
             except (ValueError, TypeError) as e:
-                raise ValueError(f"Invalid time format: {value}. Expected HH:MM:SS or HH:MM")
+                raise ValueError(f"Invalid time format: {value}. Expected HH:MM:SS, HH:MM, H:MM:SS AM/PM, or H:MM AM/PM")
         elif isinstance(value, datetime):
-            return value.time()
+            return value.strftime("%I:%M %p")
         elif isinstance(value, time):
-            return value
+            return value.strftime("%I:%M %p")
         return value
 
 class JobCreate(JobBase):
@@ -82,7 +95,7 @@ class JobListItem(BaseModel):
     status: str
     created_at: datetime
     bid_date: Optional[date] = None
-    bid_time: Optional[time] = None
+    bid_time: Optional[str] = None
     client_name: Optional[str] = None
     location: Optional[str] = None
 
@@ -100,7 +113,7 @@ class JobCreatedResponse(BaseModel):
     created_at: datetime
     status: str = "draft"
     bid_date: Optional[date] = None
-    bid_time: Optional[time] = None
+    bid_time: Optional[str] = None
     client_name: Optional[str] = None
     location: Optional[str] = None
 
