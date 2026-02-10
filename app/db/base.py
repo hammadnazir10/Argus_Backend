@@ -17,3 +17,6 @@ class TimestampMixin:
         onupdate=datetime.utcnow, 
         nullable=False
     )
+
+# Import all models here to ensure they're included in metadata
+from app.models.job import Job  # noqa: E402

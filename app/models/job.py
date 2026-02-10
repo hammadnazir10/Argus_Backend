@@ -17,9 +17,11 @@ class Job(Base, TimestampMixin):
     status = Column(String(50), default="draft", index=True)
     due_date = Column(DateTime, nullable=True)
     gc_name = Column(String(255), nullable=True)
+    client_name = Column(String(255), nullable=True)
+    location = Column(String(255), nullable=True)
     bom_file_key = Column(String(500), nullable=True)
     quote_file_keys = Column(ARRAY(String), nullable=True, default=[])
     execution_arn = Column(String(500), nullable=True)
 
     def __repr__(self):
-        return f"<Job(id={self.id}, job_id={self.job_id}, user_id={self.user_id}, project_name={self.project_name})>"
+        return f"<Job(id={self.id}, job_id={self.job_id}, user_id={self.user_id}, project_name={self.project_name}, client_name={self.client_name}, location={self.location})>"

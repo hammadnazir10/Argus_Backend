@@ -8,6 +8,8 @@ class JobBase(BaseModel):
     project_name: str = Field(..., min_length=1, max_length=100, description="Project name for the bid")
     due_date: Optional[datetime] = Field(None, description="Optional due date for the bid")
     gc_name: Optional[str] = Field(None, max_length=200, description="General contractor name")
+    client_name: Optional[str] = Field(None, max_length=255, description="Client name for the project")
+    location: Optional[str] = Field(None, max_length=255, description="Project location")
 
 
 
@@ -70,6 +72,8 @@ class JobListItem(BaseModel):
     created_at: datetime
     due_date: Optional[datetime] = None
     gc_name: Optional[str] = None
+    client_name: Optional[str] = None
+    location: Optional[str] = None
 
 
 class JobDetailResponse(JobRead):

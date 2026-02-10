@@ -37,7 +37,7 @@ class JobService:
         
         Args:
             user_id: User ID who created the job
-            job_in: Job creation schema with project_name, due_date, gc_name
+            job_in: Job creation schema with project_name, due_date, gc_name, client_name, location
             
         Returns:
             Created Job object
@@ -60,6 +60,8 @@ class JobService:
             status="draft",
             due_date=job_in.due_date,
             gc_name=job_in.gc_name,
+            client_name=job_in.client_name,
+            location=job_in.location,
         )
         
         # Create S3 folder for this job as per Story 1.1 acceptance criteria
@@ -135,6 +137,8 @@ class JobService:
             created_at=job.created_at,
             due_date=job.due_date,
             gc_name=job.gc_name,
+            client_name=job.client_name,
+            location=job.location,
         ) for job in jobs]
     
     async def count_user_jobs(self, user_id: str) -> int:
@@ -161,6 +165,8 @@ class JobService:
             created_at=job.created_at,
             due_date=job.due_date,
             gc_name=job.gc_name,
+            client_name=job.client_name,
+            location=job.location,
             bom_file_key=job.bom_file_key,
             quote_file_keys=job.quote_file_keys or [],
             execution_arn=job.execution_arn,
