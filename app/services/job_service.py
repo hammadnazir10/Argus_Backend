@@ -37,7 +37,7 @@ class JobService:
         
         Args:
             user_id: User ID who created the job
-            job_in: Job creation schema with project_name, due_date, gc_name, client_name, location
+            job_in: Job creation schema with project_name, bid_date, bid_time, client_name, location
             
         Returns:
             Created Job object
@@ -58,8 +58,8 @@ class JobService:
             user_id=user_id,
             project_name=job_in.project_name,
             status="draft",
-            due_date=job_in.due_date,
-            gc_name=job_in.gc_name,
+            bid_date=job_in.bid_date,
+            bid_time=job_in.bid_time,
             client_name=job_in.client_name,
             location=job_in.location,
         )
@@ -135,8 +135,8 @@ class JobService:
             project_name=job.project_name,
             status=job.status,
             created_at=job.created_at,
-            due_date=job.due_date,
-            gc_name=job.gc_name,
+            bid_date=job.bid_date,
+            bid_time=job.bid_time,
             client_name=job.client_name,
             location=job.location,
         ) for job in jobs]
@@ -163,8 +163,8 @@ class JobService:
             project_name=job.project_name,
             status=job.status,
             created_at=job.created_at,
-            due_date=job.due_date,
-            gc_name=job.gc_name,
+            bid_date=job.bid_date,
+            bid_time=job.bid_time,
             client_name=job.client_name,
             location=job.location,
             bom_file_key=job.bom_file_key,

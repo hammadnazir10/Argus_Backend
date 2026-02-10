@@ -1,42 +1,53 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date, time
 
 
 class JobBase(BaseModel):
     """Base job schema."""
     project_name: str = Field(..., min_length=1, max_length=100, description="Project name for the bid")
-    due_date: Optional[datetime] = Field(None, description="Optional due date for the bid")
-    gc_name: Optional[str] = Field(None, max_length=200, description="General contractor name")
+    bid_date: Optional[date] = Field(None, description="Optional bid date")
+    bid_time: Optional[time] = Field(None, description="Optional bid time")
     client_name: Optional[str] = Field(None, max_length=255, description="Client name for the project")
     location: Optional[str] = Field(None, max_length=255, description="Project location")
 
 
 
-    @field_validator("due_date", mode="before")
+    @field_validator("bid_date", mode="before")
     @classmethod
-    def parse_due_date(cls, value):
+    def parse_bid_date(cls, value):
         if isinstance(value, str):
             try:
-                # Handle ISO format (2026-02-05T11:00:00)
+                # Handle ISO format date (2026-02-05 or 2026-02-05T...)
                 if 'T' in value:
-                    dt = datetime.fromisoformat(value.replace('Z', '+00:00'))
-                    # Convert timezone-aware datetime to naive UTC datetime
-                    if dt.tzinfo is not None:
-                        return dt.astimezone().replace(tzinfo=None)
-                    return dt
+                    # Extract date part from ISO datetime
+                    return datetime.fromisoformat(value.replace('Z', '+00:00')).date()
                 # Handle date only format (2026-02-05)
-                elif len(value) == 10 and value.count('-') == 2:
-                    return datetime.strptime(value, "%Y-%m-%d")
-                # Handle datetime with space separator (2026-02-05 11:00:00)
-                else:
-                    return datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+                return datetime.strptime(value, "%Y-%m-%d").date()
             except (ValueError, TypeError) as e:
-                raise ValueError(f"Invalid date format: {value}. Expected ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD HH:MM:SS")
+                raise ValueError(f"Invalid date format: {value}. Expected YYYY-MM-DD")
         elif isinstance(value, datetime):
-            # Handle datetime objects - ensure they are timezone-naive
-            if value.tzinfo is not None:
-                return value.astimezone().replace(tzinfo=None)
+            return value.date()
+        elif isinstance(value, date):
+            return value
+        return value
+    
+    @field_validator("bid_time", mode="before")
+    @classmethod
+    def parse_bid_time(cls, value):
+        if isinstance(value, str):
+            try:
+                # Handle ISO format time (14:30:00 or HH:MM:SS)
+                if len(value) == 8 and value.count(':') == 2:
+                    return datetime.strptime(value, "%H:%M:%S").time()
+                # Handle HH:MM format
+                elif len(value) == 5 and value.count(':') == 1:
+                    return datetime.strptime(value, "%H:%M").time()
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"Invalid time format: {value}. Expected HH:MM:SS or HH:MM")
+        elif isinstance(value, datetime):
+            return value.time()
+        elif isinstance(value, time):
             return value
         return value
 
@@ -70,8 +81,8 @@ class JobListItem(BaseModel):
     project_name: str
     status: str
     created_at: datetime
-    due_date: Optional[datetime] = None
-    gc_name: Optional[str] = None
+    bid_date: Optional[date] = None
+    bid_time: Optional[time] = None
     client_name: Optional[str] = None
     location: Optional[str] = None
 

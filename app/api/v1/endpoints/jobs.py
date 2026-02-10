@@ -9,7 +9,7 @@ from app.schemas.common import ResponseModel
 router = APIRouter()
 
 
-@router.post("/", response_model=ResponseModel[JobCreatedResponse], status_code=status.HTTP_201_CREATED)
+@router.post("/createJob", response_model=ResponseModel[JobCreatedResponse], status_code=status.HTTP_201_CREATED)
 async def create_job(job_in: JobCreate, user: dict = Depends(get_current_user), db = Depends(get_database)) -> dict:
     """Create a new job (Story 1.1)."""
     try:

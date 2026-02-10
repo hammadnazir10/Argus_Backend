@@ -1,6 +1,6 @@
-from sqlalchemy import Column, String, DateTime, Integer, ARRAY, ForeignKey
+from sqlalchemy import Column, String, DateTime, Date, Time, Integer, ARRAY, ForeignKey
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, date, time
 from typing import Optional, List
 from app.db.base import Base, TimestampMixin
 
@@ -15,8 +15,8 @@ class Job(Base, TimestampMixin):
     user_id = Column(String(36), index=True, nullable=False)
     project_name = Column(String(255), nullable=False)
     status = Column(String(50), default="draft", index=True)
-    due_date = Column(DateTime, nullable=True)
-    gc_name = Column(String(255), nullable=True)
+    bid_date = Column(Date, nullable=True)
+    bid_time = Column(Time, nullable=True)
     client_name = Column(String(255), nullable=True)
     location = Column(String(255), nullable=True)
     bom_file_key = Column(String(500), nullable=True)
