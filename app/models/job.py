@@ -16,7 +16,7 @@ class Job(Base, TimestampMixin):
     project_name = Column(String(255), nullable=False)
     status = Column(String(50), default="draft", index=True)
     bid_date = Column(Date, nullable=True)
-    bid_time = Column(Time, nullable=True)
+    bid_time = Column(String(20), nullable=True)
     client_name = Column(String(255), nullable=True)
     location = Column(String(255), nullable=True)
     bom_file_key = Column(String(500), nullable=True)
